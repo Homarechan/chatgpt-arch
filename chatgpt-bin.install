@@ -1,0 +1,53 @@
+post_install() {
+  _update_desktop_database
+  _reload_apparmor_profile
+}
+
+post_upgrade() {
+  _update_desktop_database
+  _reload_apparmor_profile
+}
+
+pre_remove() {
+  if [ -L /etc/apparmor.d/disable/chatgpt ] &&
+    [ "$(readlink /etc/apparmor.d/disable/chatgpt)" = ".././chatgpt" ]; then
+    rm /etc/apparmor.d/disable/chatgpt
+  fi
+
+  if [ -f /etc/apparmor.d/abi/4.0 ] &&
+    command -v aa-enabled >/dev/null 2>&1 &&
+    command -v apparmor_parser >/dev/null 2>&1 &&
+    aa-enabled --quiet; then
+    apparmor_parser -R /etc/apparmor.d/chatgpt || true
+  fi
+}
+
+post_remove() {
+  _update_desktop_database
+}
+
+_update_desktop_database() {
+  update-desktop-database -q >/dev/null 2>&1 || true
+}
+
+_reload_apparmor_profile() {
+  if [ -f /etc/apparmor.d/abi/4.0 ]; then
+    if [ -L /etc/apparmor.d/disable/chatgpt ] &&
+      [ "$(readlink /etc/apparmor.d/disable/chatgpt)" = ".././chatgpt" ]; then
+      rm /etc/apparmor.d/disable/chatgpt
+    fi
+
+    if [ ! -e /etc/apparmor.d/disable/chatgpt ] &&
+      [ ! -L /etc/apparmor.d/disable/chatgpt ] &&
+      command -v aa-enabled >/dev/null 2>&1 &&
+      command -v apparmor_parser >/dev/null 2>&1 &&
+      aa-enabled --quiet; then
+      apparmor_parser -r -W -T /etc/apparmor.d/chatgpt || true
+    fi
+  elif command -v apparmor_parser >/dev/null 2>&1 &&
+    [ ! -e /etc/apparmor.d/disable/chatgpt ] &&
+    [ ! -L /etc/apparmor.d/disable/chatgpt ]; then
+    mkdir -p /etc/apparmor.d/disable
+    ln -s .././chatgpt /etc/apparmor.d/disable/chatgpt
+  fi
+}

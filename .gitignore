@@ -1,0 +1,7 @@
+*.deb
+*.pkg.tar*
+*.tar.xz
+/deb-extract/
+/pkg/
+/pkgwork/
+/src/
