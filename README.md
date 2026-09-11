@@ -7,7 +7,7 @@ Arch Linux用のChatGPT非公式PKGBUILDです。
 
 ## これは何か
 
-`PKGBUILD`は、公式debを入力として扱い、deb内の`data.tar.xz`をArchパッケージの`$pkgdir`へ展開します。
+`PKGBUILD`は、公式debを入力として扱い、deb内の`data.tar.*`をArchパッケージの`$pkgdir`へ展開します。
 アプリ本体のバイナリや同梱ライブラリは再コンパイルしません。
 
 含まれる主な処理は次の通りです。
@@ -60,17 +60,41 @@ deb本体、生成済みのArchパッケージ、deb展開済みの`control`/`da
 commit前には、キー、トークン、パスワード、ローカルユーザー名、ローカルパスなどが含まれていないかを検索し、問題のないファイルだけをstageしました。
 commit authorもローカルメールアドレスではなく、GitHubのnoreply形式に設定してからcommitしました。
 
+## 自動更新
+
+最新版の有無だけを確認する場合は、次を実行します。
+
+```bash
+./update.sh --check
+```
+
+最新版を取得し、検査、PKGBUILD更新、ビルド確認まで行う場合は次を実行します。
+
+```bash
+./update.sh
+```
+
+`update.sh`はsudoを実行せず、パッケージを自動インストールせず、git commitやgit pushも行いません。
+更新がある場合は、一時ディレクトリ内で`makepkg --cleanbuild`が成功した後にだけ、更新済みの`PKGBUILD`、公式deb、生成されたArchパッケージをリポジトリへ配置します。ビルドに失敗した場合、既存の`PKGBUILD`とdebは変更しません。
+
+必要なコマンドは、`bash`、`curl`、`ar`、`tar`、`makepkg`、`sha256sum`、`awk`、`sed`、`grep`、`diff`、`find`などです。Arch Linuxでは、主に`base-devel`、`curl`、ならびにtarの圧縮形式に応じた`xz`または`zstd`から提供されます。`git`が利用可能な場合は、処理の最後に作業ツリーの差分も表示します。
+
+最新版の取得には、OpenAIの[Linux版公式ドキュメント](https://learn.chatgpt.com/docs/linux/linux-app)が直接案内している`persistent.oaistatic.com`上のx64 `.deb`だけを使用します。非公式ミラーや第三者のバージョン情報は参照しません。URLにバージョン番号を推測で組み立てることもせず、ダウンロードしたdebの`control`にある`Version`を`pkgver`の正とします。
+
+更新時には、`ar`と`tar`を使って`control.tar.*`と`data.tar.*`を検出するため、xzまたはzstdへの圧縮形式変更に対応できます。必須パス、desktop file、アイコン、AppArmor profile、同梱共有ライブラリを確認し、`upstream-metadata`に保存した直前のcontrol情報と比較します。Debian依存関係やmaintainer scriptsに変更があった場合は警告しますが、Archパッケージ名への依存関係の変換は自動では行いません。
+
+実行後は、表示された`git diff`、特に`PKGBUILD`の依存関係と`chatgpt-bin.install`への影響を必ず確認してください。確認後、最後に表示される`sudo pacman -U`コマンドをユーザー自身で実行してインストールします。
+
 ## ビルド方法
 
 同じディレクトリに公式debを`chatgpt_amd64.deb`という名前で置いてから、次を実行します。
 
 ```bash
-makepkg -si
+makepkg --cleanbuild
 ```
 
-`makepkg -si`はインストール時に`sudo`パスワードを要求します。
 Codexによる検証では、パッケージ生成の`makepkg -f`は成功しました。
-実インストールはユーザー側で行う前提です。
+生成物を確認した後の実インストールはユーザー側で行う前提です。
 
 ## 注意
 
@@ -91,7 +115,7 @@ This repository repackages the official Debian package distributed by OpenAI,
 ## What This Is
 
 The `PKGBUILD` treats the official deb as the input artifact and extracts the
-deb's `data.tar.xz` into Arch's `$pkgdir`. The application binary and bundled
+deb's `data.tar.*` into Arch's `$pkgdir`. The application binary and bundled
 libraries are not recompiled.
 
 The package preserves the important layout from the deb:
@@ -157,17 +181,59 @@ tokens, passwords, local usernames, and local filesystem paths. Only the safe
 packaging files were staged. The commit author was configured to use a GitHub
 noreply address instead of a local email address.
 
+## Automated Updates
+
+To check only whether a newer release exists, run:
+
+```bash
+./update.sh --check
+```
+
+To download, inspect, update the PKGBUILD, and verify a clean build, run:
+
+```bash
+./update.sh
+```
+
+The script never invokes sudo, installs a package, commits, or pushes. When an
+update exists, it runs `makepkg --cleanbuild` in a temporary directory first.
+Only a successful build causes the updated `PKGBUILD`, official deb, and built
+Arch package to be placed in the repository. A failed build leaves the existing
+PKGBUILD and deb unchanged.
+
+Required commands include `bash`, `curl`, `ar`, `tar`, `makepkg`, `sha256sum`,
+`awk`, `sed`, `grep`, `diff`, and `find`. On Arch Linux these are primarily
+provided by `base-devel`, `curl`, and either `xz` or `zstd` for the compression
+used by the Debian archive. If `git` is available, the script also displays the
+working-tree diff at the end.
+
+The updater uses only the x64 `.deb` on `persistent.oaistatic.com` linked
+directly from OpenAI's [official Linux documentation](https://learn.chatgpt.com/docs/linux/linux-app).
+It does not use mirrors, third-party version indexes, or guessed versioned URLs.
+The downloaded package's Debian `Version` control field is authoritative for
+`pkgver`.
+
+The script discovers `control.tar.*` and `data.tar.*` with `ar` and `tar`, so
+xz-to-zstd archive changes are supported. It verifies the required paths,
+desktop file, icon, AppArmor profile, and bundled shared libraries, then compares
+the control metadata with the previous snapshot in `upstream-metadata`. Changes
+to Debian dependencies or maintainer scripts produce warnings. Debian package
+names are never converted to Arch dependency names automatically.
+
+After an update, review the displayed `git diff`, especially dependency changes
+in `PKGBUILD` and any possible effect on `chatgpt-bin.install`. Install only
+after that review, using the `sudo pacman -U` command printed by the script.
+
 ## Building
 
 Place the official deb in the repository root as `chatgpt_amd64.deb`, then run:
 
 ```bash
-makepkg -si
+makepkg --cleanbuild
 ```
 
-`makepkg -si` will require sudo authorization when installing the package. Codex
-verified that package creation with `makepkg -f` succeeded. The actual system
-installation is expected to be performed by the user.
+Codex verified that package creation with `makepkg -f` succeeded. Inspect the
+resulting package before performing the actual installation yourself.
 
 ## Notes
 

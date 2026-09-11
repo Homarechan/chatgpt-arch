@@ -1,0 +1,12 @@
+etc/apparmor.d/chatgpt
+usr/bin/chatgpt
+usr/lib/chatgpt/ChatGPT
+usr/lib/chatgpt/codex-launcher
+usr/lib/chatgpt/libEGL.so
+usr/lib/chatgpt/libGLESv2.so
+usr/lib/chatgpt/libqt5_shim.so
+usr/lib/chatgpt/libqt6_shim.so
+usr/lib/chatgpt/libvk_swiftshader.so
+usr/lib/chatgpt/libvulkan.so.1
+usr/share/applications/chatgpt.desktop
+usr/share/pixmaps/chatgpt.png

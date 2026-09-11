@@ -1,5 +1,5 @@
 pkgname=chatgpt-bin
-pkgver=26.803.81509
+pkgver=26.901.51231
 pkgrel=1
 pkgdesc='ChatGPT by OpenAI'
 arch=('x86_64')
@@ -15,7 +15,6 @@ depends=(
   'gdk-pixbuf2'
   'glib2'
   'glibc'
-  'graphite'
   'gtk3'
   'libcups'
   'libdrm'
@@ -35,11 +34,11 @@ depends=(
   'mesa'
   'nspr'
   'nss'
-  'openssl'
   'pango'
   'qt5-base'
   'qt6-base'
   'systemd-libs'
+  'vulkan-driver'
   'xdg-utils'
   'xz'
 )
@@ -60,15 +59,26 @@ options=('!strip' '!debug')
 _deb='chatgpt_amd64.deb'
 source=("${_deb}")
 noextract=("${_deb}")
-sha256sums=('a9bf91a368f9f7c4eea38082a9fb8fb46b8d005b719a6d7715d2e5a1982c38eb')
+sha256sums=('62580188d87c3d3a9369dab7c73b42a8a32518d4df8a2d5bae6466ddeac5c05e')
 
 prepare() {
   cd "${srcdir}"
-  ar x "${_deb}" control.tar.xz data.tar.xz
+
+  local -a data_members=()
+  mapfile -t data_members < <(ar t "${_deb}" | sed -n '/^data\.tar\($\|\.\)/p')
+  if (( ${#data_members[@]} != 1 )); then
+    error "Expected exactly one data.tar.*, found ${#data_members[@]}"
+    return 1
+  fi
+
+  ar x "${_deb}" "${data_members[0]}"
+  printf '%s\n' "${data_members[0]}" > .data-member
 }
 
 package() {
-  tar --no-same-owner -xf "${srcdir}/data.tar.xz" -C "${pkgdir}"
+  local data_member
+  data_member=$(<"${srcdir}/.data-member")
+  tar --no-same-owner -xf "${srcdir}/${data_member}" -C "${pkgdir}"
 
   rm -rf "${pkgdir}/usr/share/lintian"
   install -Dm644 "${pkgdir}/usr/share/doc/chatgpt/copyright" \
